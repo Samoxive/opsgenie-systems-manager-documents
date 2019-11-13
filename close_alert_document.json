@@ -1,0 +1,78 @@
+{
+    "description": "Creates an alert for your Opsgenie Team.",
+    "schemaVersion": "0.3",
+    "assumeRole": "{{ AutomationAssumeRole }}",
+    "parameters": {
+        "genieKey": {
+            "type": "String",
+            "description": "(Required) Opsgenie API Token for authorization"
+        },
+        "identifier": {
+            "type": "String",
+            "description": "(Required) Identifier"
+        },
+        "identifierType": {
+            "type": "String",
+            "description": "(Optional) Type of the identifier, possible values are id, tiny and alias. Default value is id."
+        },
+        "genieUrl": {
+            "type": "String",
+            "description": "(Optional) Opsgenie API Url",
+            "default": ""
+        },
+        "AutomationAssumeRole": {
+            "type": "String",
+            "description": "(Optional) The ARN of the role that allows Automation document to perform the actions on your behalf",
+            "default": ""
+        },
+        "user": {
+            "type": "String",
+            "description": "(Optional) Display name of the request owner",
+            "default": ""
+        },
+        "source": {
+            "type": "String",
+            "description": "(Optional) Display name of the request source",
+            "default": ""
+        },
+        "note": {
+            "type": "String",
+            "description": "(Optional) Additional alert note to add",
+            "default": ""
+        }
+    },
+    "mainSteps": [{
+        "name": "createDocumentStack",
+        "action": "aws:createStack",
+        "inputs": {
+            "Capabilities": [
+                "CAPABILITY_IAM",
+                "CAPABILITY_NAMED_IAM"
+            ],
+            "StackName": "CloseOpsgenieAlert-{{automation:EXECUTION_ID}}",
+            "Parameters": [{
+                    "ParameterKey": "LambdaRoleName",
+                    "ParameterValue": "CloseOpsgenieAlertRole-{{automation:EXECUTION_ID}}"
+                },
+                {
+                    "ParameterKey": "LambdaName",
+                    "ParameterValue": "CloseOpsgenieAlert-{{automation:EXECUTION_ID}}"
+                }
+            ],
+            "TemplateBody": "{\"Parameters\":{\"LambdaName\":{\"Description\":\"\",\"Type\":\"String\"},\"LambdaRoleName\":{\"Description\":\"\",\"Type\":\"String\"}},\"Resources\":{\"CloseOpsgenieAlertLambdaRole\":{\"Type\":\"AWS::IAM::Role\",\"Properties\":{\"AssumeRolePolicyDocument\":{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"sts:AssumeRole\"],\"Principal\":{\"Service\":[\"lambda.amazonaws.com\"]}}]},\"Policies\":[],\"RoleName\":{\"Ref\":\"LambdaRoleName\"}}},\"CloseOpsgenieAlert\":{\"Type\":\"AWS::Lambda::Function\",\"Properties\":{\"Handler\":\"index.handler\",\"Role\":{\"Fn::GetAtt\":[\"CloseOpsgenieAlertLambdaRole\",\"Arn\"]},\"Runtime\":\"python3.6\",\"FunctionName\":{\"Ref\":\"LambdaName\"},\"Code\":{\"ZipFile\":\"import boto3\\nimport json\\nfrom botocore.vendored import requests\\ndef handler(event, ctx):\\n\\tgenieKey = event['genieKey']\\n\\tidentifier = event['identifier']\\n\\tidentifierType = event['identifierType']\\n\\tif not identifierType:\\n\\t\\tidentifierType = 'id'\\n\\tdata = {}\\n\\tuser = event['user']\\n\\tif user:\\n\\t\\tdata['user'] = user\\n\\tsource = event['source']\\n\\tif source:\\n\\t\\tdata['source'] = source\\n\\tnote = event['note']\\n\\tif note:\\n\\t\\tdata['note'] = note\\n\\tgenieUrl = event['genieUrl']\\n\\tif not genieUrl:\\n\\t\\tgenieUrl = 'https://api.opsgenie.com'\\n\\theaders = {'Content-Type': 'application/json', 'Authorization': 'GenieKey {}'.format(genieKey)}\\n\\tparams = {'identifierType': identifierType}\\n\\tresponse = requests.post('{}/v2/alerts/{}/close'.format(genieUrl, identifier), headers=headers, data=json.dumps(data), params=params)\\n\\tif not response.ok:\\n\\t\\traise Exception('API responded with error! ' + response.text)\\n\\treturn 'success!'\"}}}}}"
+        }
+    }, {
+        "name": "closeOpsgenieAlert",
+        "action": "aws:invokeLambdaFunction",
+        "inputs": {
+            "FunctionName": "CloseOpsgenieAlert-{{automation:EXECUTION_ID}}",
+            "Payload": "{\"genieKey\": \"{{genieKey}}\", \"identifier\": \"{{identifier}}\", \"identifierType\": \"{{identifierType}}\", \"genieUrl\": \"{{genieUrl}}\", \"user\": \"{{user}}\", \"source\": \"{{source}}\", \"note\": \"{{note}}\"}"
+        }
+    }, {
+        "name": "deleteCloudFormationTemplate",
+        "action": "aws:deleteStack",
+        "inputs": {
+            "StackName": "CloseOpsgenieAlert-{{automation:EXECUTION_ID}}"
+        }
+    }]
+}

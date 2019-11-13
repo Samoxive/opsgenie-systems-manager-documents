@@ -1,0 +1,51 @@
+{
+    "Parameters": {
+        "LambdaName": {
+            "Description": "",
+            "Type": "String"
+        },
+        "LambdaRoleName": {
+            "Description": "",
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "CloseOpsgenieAlertLambdaRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [{
+                        "Effect": "Allow",
+                        "Action": ["sts:AssumeRole"],
+                        "Principal": {
+                            "Service": [
+                                "lambda.amazonaws.com"
+                            ]
+                        }
+                    }]
+                },
+                "Policies": [],
+                "RoleName": {
+                    "Ref": "LambdaRoleName"
+                }
+            }
+        },
+        "CloseOpsgenieAlert": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Handler": "index.handler",
+                "Role": {
+                    "Fn::GetAtt": ["CloseOpsgenieAlertLambdaRole", "Arn"]
+                },
+                "Runtime": "python3.6",
+                "FunctionName": {
+                    "Ref": "LambdaName"
+                },
+                "Code": {
+                    "ZipFile": "import boto3\\nimport json\\nfrom botocore.vendored import requests\\ndef handler(event, ctx):\\n\\tgenieKey = event['genieKey']\\n\\tidentifier = event['identifier']\\n\\tidentifierType = event['identifierType']\\n\\tif not identifierType:\\n\\t\\tidentifierType = 'id'\\n\\tdata = {}\\n\\tuser = event['user']\\n\\tif user:\\n\\t\\tdata['user'] = user\\n\\tsource = event['source']\\n\\tif source:\\n\\t\\tdata['source'] = source\\n\\tnote = event['note']\\n\\tif note:\\n\\t\\tdata['note'] = note\\n\\tgenieUrl = event['genieUrl']\\n\\tif not genieUrl:\\n\\t\\tgenieUrl = 'https://api.opsgenie.com'\\n\\theaders = {'Content-Type': 'application/json', 'Authorization': 'GenieKey {}'.format(genieKey)}\\n\\tparams = {'identifierType': identifierType}\\n\\tresponse = requests.post('{}/v2/alerts/{}/close'.format(genieUrl, identifier), headers=headers, data=json.dumps(data), params=params)\\n\\tif not response.ok:\\n\\t\\traise Exception('API responded with error! ' + response.text)\\n\\treturn 'success!'"
+                }
+            }
+        }
+    }
+}

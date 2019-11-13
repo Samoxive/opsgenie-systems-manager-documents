@@ -1,0 +1,104 @@
+{
+    "description": "Creates an alert for your Opsgenie Team.",
+    "schemaVersion": "0.3",
+    "assumeRole": "{{ AutomationAssumeRole }}",
+    "parameters": {
+        "genieKey": {
+            "type": "String",
+            "description": "(Required) Opsgenie API Token for authorization"
+        },
+        "message": {
+            "type": "String",
+            "description": "(Required) Alert message"
+        },
+        "genieUrl": {
+            "type": "String",
+            "description": "(Optional) Opsgenie API Url",
+            "default": ""
+        },
+        "AutomationAssumeRole": {
+            "type": "String",
+            "description": "(Optional) The ARN of the role that allows Automation document to perform the actions on your behalf",
+            "default": ""
+        },
+        "alias": {
+            "type": "String",
+            "description": "(Optional) Identifier of event for deduplication",
+            "default": ""
+        },
+        "description": {
+            "type": "String",
+            "description": "(Optional) Detailed information about the event",
+            "default": ""
+        },
+        "actions": {
+            "type": "String",
+            "description": "(Optional) Custom actions available for the alert (enter each element with commas in between)",
+            "default": ""
+        },
+        "tags": {
+            "type": "String",
+            "description": "(Optional) Tags of the alert (enter each element with commas in between)",
+            "default": ""
+        },
+        "entity": {
+            "type": "String",
+            "description": "(Optional) Entity field of the alert, usually domain",
+            "default": ""
+        },
+        "source": {
+            "type": "String",
+            "description": "(Optional) Source of the alert, usually IP address",
+            "default": ""
+        },
+        "priority": {
+            "type": "String",
+            "description": "(Optional) Priority level of the alert",
+            "default": ""
+        },
+        "user": {
+            "type": "String",
+            "description": "(Optional) Display name of the request owner",
+            "default": ""
+        },
+        "note": {
+            "type": "String",
+            "description": "(Optional) Additional note for the alert",
+            "default": ""
+        }
+    },
+    "mainSteps": [{
+        "name": "createDocumentStack",
+        "action": "aws:createStack",
+        "inputs": {
+            "Capabilities": [
+                "CAPABILITY_IAM",
+                "CAPABILITY_NAMED_IAM"
+            ],
+            "StackName": "CreateOpsgenieAlert-{{automation:EXECUTION_ID}}",
+            "Parameters": [{
+                    "ParameterKey": "LambdaRoleName",
+                    "ParameterValue": "CreateOpsgenieAlertRole-{{automation:EXECUTION_ID}}"
+                },
+                {
+                    "ParameterKey": "LambdaName",
+                    "ParameterValue": "CreateOpsgenieAlert-{{automation:EXECUTION_ID}}"
+                }
+            ],
+            "TemplateBody": "{\"Parameters\":{\"LambdaName\":{\"Description\":\"\",\"Type\":\"String\"},\"LambdaRoleName\":{\"Description\":\"\",\"Type\":\"String\"}},\"Resources\":{\"CreateOpsgenieAlertLambdaRole\":{\"Type\":\"AWS::IAM::Role\",\"Properties\":{\"AssumeRolePolicyDocument\":{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"sts:AssumeRole\"],\"Principal\":{\"Service\":[\"lambda.amazonaws.com\"]}}]},\"Policies\":[],\"RoleName\":{\"Ref\":\"LambdaRoleName\"}}},\"CreateOpsgenieAlert\":{\"Type\":\"AWS::Lambda::Function\",\"Properties\":{\"Handler\":\"index.handler\",\"Role\":{\"Fn::GetAtt\":[\"CreateOpsgenieAlertLambdaRole\",\"Arn\"]},\"Runtime\":\"python3.6\",\"FunctionName\":{\"Ref\":\"LambdaName\"},\"Code\":{\"ZipFile\":\"import boto3\\nimport json\\nfrom botocore.vendored import requests\\ndef handler(event, ctx):\\n\\tgenieKey = event['genieKey']\\n\\tmessage = event['message']\\n\\tgenieUrl = event['genieUrl']\\n\\tmessage = event['message']\\n\\tdata = {'message': message}\\n\\talias = event['alias']\\n\\tif alias:\\n\\t\\tdata['alias'] = alias\\n\\tdescription = event['description']\\n\\tif description:\\n\\t\\tdata['description'] = description\\n\\tactions = event['actions']\\n\\tif actions:\\n\\t\\tdata['actions'] = actions.split(',')\\n\\ttags = event['tags']\\n\\tif tags:\\n\\t\\tdata['tags'] = tags.split(',')\\n\\tentity = event['entity']\\n\\tif entity:\\n\\t\\tdata['entity'] = entity\\n\\tsource = event['source']\\n\\tif source:\\n\\t\\tdata['source'] = source\\n\\tpriority = event['priority']\\n\\tif priority:\\n\\t\\tdata['priority'] = priority\\n\\tuser = event['user']\\n\\tif user:\\n\\t\\tdata['user'] = user\\n\\tnote = event['note']\\n\\tif note:\\n\\t\\tdata['note'] = note\\n\\theaders = {'Content-Type': 'application/json', 'Authorization': 'GenieKey {}'.format(genieKey)}\\n\\tif genieUrl == '':\\n\\t\\tgenieUrl = 'https://api.opsgenie.com'\\n\\tresponse = requests.post('{}/v2/alerts'.format(genieUrl), headers=headers, data=json.dumps(data))\\n\\tif not response.ok:\\n\\t\\traise Exception('API responded with error! ' + response.text)\\n\\treturn 'success!'\"}}}}}"
+        }
+    }, {
+        "name": "createOpsgenieAlert",
+        "action": "aws:invokeLambdaFunction",
+        "inputs": {
+            "FunctionName": "CreateOpsgenieAlert-{{automation:EXECUTION_ID}}",
+            "Payload": "{\"genieKey\": \"{{genieKey}}\", \"message\": \"{{message}}\", \"genieUrl\": \"{{genieUrl}}\", \"alias\": \"{{alias}}\", \"description\": \"{{description}}\", \"actions\": \"{{actions}}\", \"tags\": \"{{tags}}\", \"entity\": \"{{entity}}\", \"source\": \"{{source}}\", \"priority\": \"{{priority}}\", \"user\": \"{{user}}\", \"note\": \"{{note}}\"}"
+        }
+    }, {
+        "name": "deleteCloudFormationTemplate",
+        "action": "aws:deleteStack",
+        "inputs": {
+            "StackName": "CreateOpsgenieAlert-{{automation:EXECUTION_ID}}"
+        }
+    }]
+}

@@ -1,0 +1,51 @@
+{
+    "Parameters": {
+        "LambdaName": {
+            "Description": "",
+            "Type": "String"
+        },
+        "LambdaRoleName": {
+            "Description": "",
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "CreateOpsgenieAlertLambdaRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [{
+                        "Effect": "Allow",
+                        "Action": ["sts:AssumeRole"],
+                        "Principal": {
+                            "Service": [
+                                "lambda.amazonaws.com"
+                            ]
+                        }
+                    }]
+                },
+                "Policies": [],
+                "RoleName": {
+                    "Ref": "LambdaRoleName"
+                }
+            }
+        },
+        "CreateOpsgenieAlert": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Handler": "index.handler",
+                "Role": {
+                    "Fn::GetAtt": ["CreateOpsgenieAlertLambdaRole", "Arn"]
+                },
+                "Runtime": "python3.6",
+                "FunctionName": {
+                    "Ref": "LambdaName"
+                },
+                "Code": {
+                    "ZipFile": "import boto3\\nimport json\\nfrom botocore.vendored import requests\\ndef handler(event, ctx):\\n\\tgenieKey = event['genieKey']\\n\\tmessage = event['message']\\n\\tgenieUrl = event['genieUrl']\\n\\tmessage = event['message']\\n\\tdata = {'message': message}\\n\\talias = event['alias']\\n\\tif alias:\\n\\t\\tdata['alias'] = alias\\n\\tdescription = event['description']\\n\\tif description:\\n\\t\\tdata['description'] = description\\n\\tactions = event['actions']\\n\\tif actions:\\n\\t\\tdata['actions'] = actions.split(',')\\n\\ttags = event['tags']\\n\\tif tags:\\n\\t\\tdata['tags'] = tags.split(',')\\n\\tentity = event['entity']\\n\\tif entity:\\n\\t\\tdata['entity'] = entity\\n\\tsource = event['source']\\n\\tif source:\\n\\t\\tdata['source'] = source\\n\\tpriority = event['priority']\\n\\tif priority:\\n\\t\\tdata['priority'] = priority\\n\\tuser = event['user']\\n\\tif user:\\n\\t\\tdata['user'] = user\\n\\tnote = event['note']\\n\\tif note:\\n\\t\\tdata['note'] = note\\n\\theaders = {'Content-Type': 'application/json', 'Authorization': 'GenieKey {}'.format(genieKey)}\\n\\tif genieUrl == '':\\n\\t\\tgenieUrl = 'https://api.opsgenie.com'\\n\\tresponse = requests.post('{}/v2/alerts'.format(genieUrl), headers=headers, data=json.dumps(data))\\n\\tif not response.ok:\\n\\t\\traise Exception('API responded with error! ' + response.text)\\n\\treturn 'success!'"
+                }
+            }
+        }
+    }
+}
